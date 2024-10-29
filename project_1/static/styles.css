@@ -5,8 +5,13 @@ body {
 
 .navbar {
     background-color: #007bff; /* สีพื้นหลัง navbar */
+    
 }
-
+.navbar-text {
+    color: #f0f4f8;
+    text-decoration: none;
+    margin: 0 1rem;
+}
 .navbar-brand, .nav-link {
     color: #fff !important; /* สีข้อความใน navbar */
 }
@@ -22,6 +27,7 @@ body {
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* เงา */
     margin-top: 20px; /* ระยะห่างจากด้านบน */
 }
+
 
 h2 {
     margin-bottom: 20px; /* ระยะห่างด้านล่าง */
