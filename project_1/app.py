@@ -1,174 +1,74 @@
-from flask import Flask, request, render_template, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, request, redirect, url_for
+import pandas as pd
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///employees.db'  # Database URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
-# Employee Model for Database
-class EmployeeDB(db.Model):
-    emp_id = db.Column(db.String(10), primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    position = db.Column(db.String(100), nullable=False)
-    hire_date = db.Column(db.String(10), nullable=False)  # Change to Date type if needed
-    no = db.Column(db.String(100), nullable=False)
-
-# Employee class for BST
-class Employee:
-    def __init__(self, emp_id, name, position, hire_date,no):
-        self.emp_id = emp_id
-        self.name = name
-        self.position = position
-        self.hire_date = hire_date
-        self.no = no
-        self.left = None
-        self.right = None
-
-class BST:
-    def __init__(self):
-        self.root = None
-
-    def insert(self, emp_id, name, position, hire_date,no):
-        # Check for existing employee in the database
-        existing_employee = EmployeeDB.query.filter_by(emp_id=emp_id).first()
-        if existing_employee:
-            return False  # Return False if employee already exists
-
-        new_employee = Employee(emp_id, name, position, hire_date,no)
-        if self.root is None:
-            self.root = new_employee
-        else:
-            self._insert_rec(self.root, new_employee)
-
-        # Save to database
-        new_db_employee = EmployeeDB(emp_id=emp_id, name=name, position=position, hire_date=hire_date,no=no)
-        db.session.add(new_db_employee)
-        db.session.commit()
-        
-        return True  # Return True if insertion is successful
-
-        
-    def _insert_rec(self, node, new_employee):
-        if new_employee.emp_id < node.emp_id:
-            if node.left is None:
-                node.left = new_employee
-            else:
-                self._insert_rec(node.left, new_employee)
-        else:
-            if node.right is None:
-                node.right = new_employee
-            else:
-                self._insert_rec(node.right, new_employee)
-
-    def inorder(self):
-        return self._inorder_rec(self.root)
-
-    def _inorder_rec(self, node):
-        if node is None:
-            return []
-        return self._inorder_rec(node.left) + [node] + self._inorder_rec(node.right)
-
-    def delete(self, emp_id):
-        self.root = self._delete_rec(self.root, emp_id)
-        # Delete from database
-        EmployeeDB.query.filter_by(emp_id=emp_id).delete()
-        db.session.commit()
-
-    def _delete_rec(self, node, emp_id):
-        if node is None:
-            return node
-        if emp_id < node.emp_id:
-            node.left = self._delete_rec(node.left, emp_id)
-        elif emp_id > node.emp_id:
-            node.right = self._delete_rec(node.right, emp_id)
-        else:
-            if node.left is None:
-                return node.right
-            elif node.right is None:
-                return node.left
-            min_larger_node = self._min_value_node(node.right)
-            node.emp_id, node.name, node.position, node.hire_date = (
-                min_larger_node.emp_id,
-                min_larger_node.name,
-                min_larger_node.position,
-                min_larger_node.hire_date,
-            )
-            node.right = self._delete_rec(node.right, min_larger_node.emp_id)
-        return node
-
-    def _min_value_node(self, node):
-        current = node
-        while current.left is not None:
-            current = current.left
-        return current
-
-    def search(self, emp_id):
-        return self._search_rec(self.root, emp_id)
-
-    def _search_rec(self, node, emp_id):
-        if node is None or node.emp_id == emp_id:
-            return node
-        if emp_id < node.emp_id:
-            return self._search_rec(node.left, emp_id)
-        return self._search_rec(node.right)
-
-# Global BST instance
-employee_tree = BST()
-
-# Initialize the database
-with app.app_context():
-    db.create_all()
-
-
+# Load data from the Excel 
 @app.route('/')
 def index():
-    employees = employee_tree.inorder()
-    return render_template('index.html' ,employees= employees)  # Route for main.html
+    # Read Excel 
+    excel_file = 'instance\Prosth-รายการวัสดุนอกเวลาที่ต้องการสั่งซื้อ.xlsx'
+    df = pd.read_excel(excel_file)
 
+    # Replace NaN values with an empty string
+    df = df.fillna('')
 
-@app.route('/add', methods=['GET', 'POST'])
-def add_employee():
-    message = ""
-    if request.method == 'POST':
-        emp_id = request.form['emp_id']
-        name = request.form['name']
-        position = request.form['position']
-        hire_date = request.form['hire_date']
-        no = request.form['no']
-        
-        # Insert new employee
-        insertion_successful = employee_tree.insert(emp_id, name, position, hire_date,no)
-        if not insertion_successful:
-            message = "Employee ID already exists. Please use a different ID."
-        else:
-            message = "ทำรายการสำเร็จ!"  # Success message in Thai
+    # Convert the DataFrame 
+    DataBase = df.to_dict(orient='records')
 
-        return render_template('add.html', message=message)
-    
-    return render_template('add.html', message=message)
+    # Pass data to the template
+    return render_template('index.html', Data=DataBase)
 
+# Route update data
+@app.route('/update_data', methods=['POST'])
+def update_data():
+    # Read Excel file
+    excel_file = 'instance\Prosth-รายการวัสดุนอกเวลาที่ต้องการสั่งซื้อ.xlsx'
+    df = pd.read_excel(excel_file)
 
+    # Replace NaN values with empty string
+    df = df.fillna('')
 
-@app.route('/delete/<string:emp_id>', methods=['POST'])
-def delete_employee(emp_id):
-    employee_tree.delete(emp_id)
+    # Get form data and update 
+    for i, row in df.iterrows():
+        df.at[i, 'Unnamed: 1'] = request.form.get(f'order_{i+1}')
+        df.at[i, 'Unnamed: 2'] = request.form.get(f'item_{i+1}')
+        df.at[i, 'Unnamed: 3'] = request.form.get(f'unit_{i+1}')
+        df.at[i, 'Unnamed: 4'] = request.form.get(f'stock_{i+1}')
+        df.at[i, 'Unnamed: 15'] = request.form.get(f'quantity_{i+1}')
+
+    # Write the updated DataFrame back to the Excel file
+    df.to_excel(excel_file, index=False)
+
     return redirect(url_for('index'))
 
-@app.route('/edit/<string:emp_id>', methods=['GET', 'POST'])
-def edit_employee(emp_id):
-    employee = employee_tree.search(emp_id)
-    if request.method == 'POST':
-        employee_tree.delete(emp_id)
-        employee_tree.insert(request.form['emp_id'], request.form['name'], request.form['position'], request.form['hire_date'],request.form['no'])
-        return redirect(url_for('index'))
-    return render_template('edit.html', employee=employee)
+@app.route('/edit/<int:row_index>', methods=['GET', 'POST'])
+def edit_row(row_index):
+    # Read Excel file
+    excel_file = 'instance\Prosth-รายการวัสดุนอกเวลาที่ต้องการสั่งซื้อ.xlsx'
+    df = pd.read_excel(excel_file)
 
-@app.route('/search', methods=['POST'])
-def search_employee():
-    emp_id = request.form['emp_id']
-    employee = employee_tree.search(emp_id)
-    return render_template('search_result.html', employee=employee)
+    # Replace NaN values 
+    df = df.fillna('')
+
+    if request.method == 'POST':
+        # Update the specific row 
+        df.at[row_index, 'Unnamed: 1'] = request.form['id']
+        df.at[row_index, 'Unnamed: 2'] = request.form['item']
+        df.at[row_index, 'Unnamed: 3'] = request.form['unit']
+        df.at[row_index, 'Unnamed: 4'] = request.form['stock']
+        df.at[row_index, 'Unnamed: 15'] = request.form['quantity']
+
+        # Save the updated data back to Excel
+        df.to_excel(excel_file, index=False)
+
+        return redirect(url_for('index'))
+
+    # Pass the specific row data to the template
+    row_data = df.iloc[row_index].to_dict()
+
+    return render_template('edit_row.html', row_data=row_data, row_index=row_index)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
