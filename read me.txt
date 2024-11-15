@@ -1,1 +1,21 @@
 http://10.58.107.242:8000/  
+import ctypes
+
+def prevent_sleep():
+    # ป้องกันการเข้าสู่โหมด Sleep อัตโนมัติ
+    ctypes.windll.kernel32.SetThreadExecutionState(0x80000002)
+    
+def allow_sleep():
+    # คืนค่าให้ระบบกลับเข้าสู่โหมด Sleep ได้อีกครั้ง
+    ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
+
+# เรียกใช้ prevent_sleep() ใน main ก่อนเริ่มการทำงานของ Flask แอป
+prevent_sleep()
+
+# โค้ด Flask ของคุณจะทำงานอยู่ตรงนี้
+if __name__ == '__main__':
+    try:
+        app.run(debug=True, host='0.0.0.0', port=8000)
+    finally:
+        # คืนค่าการตั้งค่า Sleep เมื่อโปรแกรมจบ
+        allow_sleep()
